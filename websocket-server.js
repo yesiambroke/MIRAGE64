@@ -606,4 +606,4 @@ class BotWebSocketServer {
 }
 
 // Start the server
-const server = new BotWebSocketServer(8080); 
+const server = new BotWebSocketServer(9899); 
