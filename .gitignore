@@ -1,5 +1,10 @@
-# JSON files
-*.json
+# Specific JSON files to exclude
+wallet.json
+stats.json
+trades.json
+active-trades.json
+strategy-config.json
+default_config.json
 
 # Node modules
 node_modules/

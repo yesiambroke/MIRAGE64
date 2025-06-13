@@ -1,0 +1,21 @@
+{
+  "name": "algo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "simple_algo.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.2",
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.2"
+  }
+}
