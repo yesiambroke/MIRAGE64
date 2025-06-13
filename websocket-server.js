@@ -24,7 +24,7 @@ const INITIAL_WALLET_DATA = {
 };
 
 class BotWebSocketServer {
-    constructor(port = 8080) {
+    constructor(port = 9899) {
         this.wss = new WebSocket.Server({ port });
         this.clients = new Set();
         this.lastStats = null;

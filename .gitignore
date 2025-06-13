@@ -5,6 +5,7 @@ trades.json
 active-trades.json
 strategy-config.json
 default_config.json
+credentials.json
 
 # Node modules
 node_modules/

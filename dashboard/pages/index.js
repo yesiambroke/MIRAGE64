@@ -256,7 +256,7 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    const websocket = new WebSocket('ws://localhost:8080');
+    const websocket = new WebSocket('ws://m64.apteka.wtf');
     setWs(websocket);
 
     websocket.onopen = () => {
