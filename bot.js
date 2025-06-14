@@ -6,9 +6,9 @@ const path = require('path');
 const axios = require('axios');
 const { getAssociatedTokenAddress, getAssociatedTokenAddressSync,createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
 const splToken = require('@solana/spl-token');
+const { NATIVE_MINT } = require('@solana/spl-token');
 const bs58 = require('bs58');
 const { Buffer } = require('buffer');
-const { TOKEN_PROGRAM_ID, NATIVE_MINT } = require('@solana/spl-token');
 require('dotenv').config();
 
 // Configuration
@@ -43,6 +43,7 @@ let NEUTRAL_ZONE_PRICE_CHANGE_THRESHOLD = 0.005;
 let MOMENTUM_STAGNANT_TIME = 1200;
 let MAX_HOLD_TIME = 60000;
 let MC_MIN = 28;
+let MC_MAX = 40;
 let PUMP_THRESHOLD = 0.05;
 let BUY_THRESHOLD = 3;
 let VOLUME_THRESHOLD = 10;
@@ -69,7 +70,9 @@ let PUMP_FUN_PROGRAM = new PublicKey(PUMP_FUN_PROGRAM_ID);
 let GLOBAL = new PublicKey('4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf');
 let FEE_RECIPIENT = new PublicKey('CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM');
 let PUMP_FUN_ACCOUNT = new PublicKey('Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1');
+let TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 let METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+let TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 let ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
 // Seeds
@@ -122,11 +125,9 @@ async function loadStrategyConfig() {
     const configPath = path.join(__dirname, 'strategy-config.json');
     const configData = await fs.readFile(configPath, 'utf8');
     strategyConfig = JSON.parse(configData);
-    
-    // Update variables immediately after loading config
-    updateStrategyVariables();
-    
     console.log('Strategy configuration loaded successfully');
+    console.log('Loaded config:', JSON.stringify(strategyConfig, null, 2));
+    
     return strategyConfig;
   } catch (error) {
     console.error('Error loading strategy configuration:', error);
@@ -134,21 +135,24 @@ async function loadStrategyConfig() {
   }
 }
 
-// Function to get strategy config value - no defaults allowed
+// Function to get strategy config value with fallback
 function getStrategyValue(key) {
   if (!strategyConfig) {
-    throw new Error(`Strategy config not loaded when trying to access ${key}`);
+    throw new Error('Strategy config not loaded');
   }
-
-  // Handle nested properties (e.g., "momentumProfitThresholds.threshold1")
-  const parts = key.split('.');
-  let value = strategyConfig;
   
-  for (const part of parts) {
-    if (!(part in value)) {
-      throw new Error(`Required config value '${key}' is missing from strategy-config.json`);
+  // Handle nested keys (e.g., 'momentumProfitThresholds.threshold1')
+  const keys = key.split('.');
+  let value = strategyConfig;
+  for (const k of keys) {
+    if (value === undefined || value === null) {
+      throw new Error(`Missing required strategy config value: ${key}`);
     }
-    value = value[part];
+    value = value[k];
+  }
+  
+  if (value === undefined || value === null) {
+    throw new Error(`Missing required strategy config value: ${key}`);
   }
   
   return value;
@@ -156,37 +160,55 @@ function getStrategyValue(key) {
 
 // Function to update all dependent variables after config reload
 function updateStrategyVariables() {
-  TRADE_AMOUNT = getStrategyValue('tradeAmount');
-  MAX_TR = getStrategyValue('maxTrades');
-  MAX_TRADES_PER_TOKEN = getStrategyValue('maxTradesPerToken');
-  TRADE_COOLDOWN = getStrategyValue('tradeCooldown');
-  PROFIT_THRESHOLD = getStrategyValue('profitThreshold');
-  LOSS_THRESHOLD = getStrategyValue('lossThreshold');
-  MOMENTUM_PROFIT_THRESHOLD = getStrategyValue('momentumProfitThreshold');
-  MOMENTUM_PROFIT_THRESHOLD_1 = getStrategyValue('momentumProfitThresholds.threshold1');
-  MOMENTUM_PROFIT_THRESHOLD_2 = getStrategyValue('momentumProfitThresholds.threshold2');
-  MOMENTUM_PROFIT_THRESHOLD_3 = getStrategyValue('momentumProfitThresholds.threshold3');
-  MOMENTUM_PROFIT_THRESHOLD_4 = getStrategyValue('momentumProfitThresholds.threshold4');
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_1 = getStrategyValue('momentumPriceChangeThresholds.threshold1');
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_2 = getStrategyValue('momentumPriceChangeThresholds.threshold2');
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_3 = getStrategyValue('momentumPriceChangeThresholds.threshold3');
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_4 = getStrategyValue('momentumPriceChangeThresholds.threshold4');
-  LOSS_THRESHOLD_TRAIL = getStrategyValue('lossThresholdTrail');
-  LOSS_PRICE_CHANGE_THRESHOLD_TRAIL = getStrategyValue('lossPriceChangeThresholdTrail');
-  NEUTRAL_ZONE_PRICE_CHANGE_THRESHOLD = getStrategyValue('neutralZonePriceChangeThreshold');
-  MOMENTUM_STAGNANT_TIME = getStrategyValue('momentumStagnantTime');
-  MAX_HOLD_TIME = getStrategyValue('maxHoldTime');
-  MC_MIN = getStrategyValue('marketCapLimits.min');
-  MC_MAX = getStrategyValue('marketCapLimits.max');
-  PUMP_THRESHOLD = getStrategyValue('pumpThreshold');
-  BUY_THRESHOLD = getStrategyValue('buyThreshold');
-  VOLUME_THRESHOLD = getStrategyValue('volumeThreshold');
-  MIN_VOLUME = getStrategyValue('minVolume');
-  CREATOR_OWNERSHIP_MAX = getStrategyValue('creatorOwnershipMax');
-  USE_DEX_SCREENER_FILTER = getStrategyValue('useDexScreenerFilter');
-  TRADE_COOLDOWN_ENABLED = getStrategyValue('tradeCooldownEnabled');
-  TRADE_COOLDOWN_PROFIT_CAP = getStrategyValue('tradeCooldownProfitCap');
-  TRADE_COOLDOWN_DURATION = getStrategyValue('tradeCooldownDuration');
+  try {
+    console.log('Updating strategy variables from config...');
+    
+    TRADE_AMOUNT = getStrategyValue('tradeAmount');
+    MAX_TR = getStrategyValue('maxTrades');
+    MAX_TRADES_PER_TOKEN = getStrategyValue('maxTradesPerToken');
+    TRADE_COOLDOWN = getStrategyValue('tradeCooldown');
+    PROFIT_THRESHOLD = getStrategyValue('profitThreshold');
+    LOSS_THRESHOLD = getStrategyValue('lossThreshold');
+    MOMENTUM_PROFIT_THRESHOLD = getStrategyValue('momentumProfitThreshold');
+    MOMENTUM_PROFIT_THRESHOLD_1 = getStrategyValue('momentumProfitThresholds.threshold1');
+    MOMENTUM_PROFIT_THRESHOLD_2 = getStrategyValue('momentumProfitThresholds.threshold2');
+    MOMENTUM_PROFIT_THRESHOLD_3 = getStrategyValue('momentumProfitThresholds.threshold3');
+    MOMENTUM_PROFIT_THRESHOLD_4 = getStrategyValue('momentumProfitThresholds.threshold4');
+    MOMENTUM_PRICE_CHANGE_THRESHOLD_1 = getStrategyValue('momentumPriceChangeThresholds.threshold1');
+    MOMENTUM_PRICE_CHANGE_THRESHOLD_2 = getStrategyValue('momentumPriceChangeThresholds.threshold2');
+    MOMENTUM_PRICE_CHANGE_THRESHOLD_3 = getStrategyValue('momentumPriceChangeThresholds.threshold3');
+    MOMENTUM_PRICE_CHANGE_THRESHOLD_4 = getStrategyValue('momentumPriceChangeThresholds.threshold4');
+    LOSS_THRESHOLD_TRAIL = getStrategyValue('lossThresholdTrail');
+    LOSS_PRICE_CHANGE_THRESHOLD_TRAIL = getStrategyValue('lossPriceChangeThresholdTrail');
+    NEUTRAL_ZONE_PRICE_CHANGE_THRESHOLD = getStrategyValue('neutralZonePriceChangeThreshold');
+    MOMENTUM_STAGNANT_TIME = getStrategyValue('momentumStagnantTime');
+    MAX_HOLD_TIME = getStrategyValue('maxHoldTime');
+    MC_MIN = getStrategyValue('marketCapLimits.min');
+    MC_MAX = getStrategyValue('marketCapLimits.max');
+    PUMP_THRESHOLD = getStrategyValue('pumpThreshold');
+    BUY_THRESHOLD = getStrategyValue('buyThreshold');
+    VOLUME_THRESHOLD = getStrategyValue('volumeThreshold');
+    MIN_VOLUME = getStrategyValue('minVolume');
+    CREATOR_OWNERSHIP_MAX = getStrategyValue('creatorOwnershipMax');
+    USE_DEX_SCREENER_FILTER = getStrategyValue('useDexScreenerFilter');
+
+    // Update cooldown settings
+    TRADE_COOLDOWN_ENABLED = getStrategyValue('tradeCooldownEnabled');
+    TRADE_COOLDOWN_PROFIT_CAP = getStrategyValue('tradeCooldownProfitCap');
+    TRADE_COOLDOWN_DURATION = getStrategyValue('tradeCooldownDuration');
+    
+    console.log('Strategy variables updated successfully:');
+    console.log(`TRADE_AMOUNT: ${TRADE_AMOUNT}`);
+    console.log(`MAX_TR: ${MAX_TR}`);
+    console.log(`MC_MIN: ${MC_MIN}, MC_MAX: ${MC_MAX}`);
+    console.log(`PROFIT_THRESHOLD: ${PROFIT_THRESHOLD}`);
+    console.log(`LOSS_THRESHOLD: ${LOSS_THRESHOLD}`);
+    console.log(`TRADE_COOLDOWN_ENABLED: ${TRADE_COOLDOWN_ENABLED}`);
+    console.log(`TRADE_COOLDOWN_PROFIT_CAP: ${TRADE_COOLDOWN_PROFIT_CAP}`);
+  } catch (error) {
+    console.error('Failed to update strategy variables:', error.message);
+    throw error; // Re-throw to prevent bot from running with invalid config
+  }
 }
 
 // Watch strategy-config.json for changes
@@ -330,7 +352,7 @@ function displayStats() {
   console.log('\n=== Pump.fun Bot Statistics ===');
   console.log(`Time Elapsed: ${Math.floor(timeElapsed)}s`);
   console.log(`SOL Price: $${currentSolPrice.toFixed(2)} (Updated ${Math.floor(timeSincePriceUpdate)}s ago)`);
-  console.log(`MC : $${MC_MIN * currentSolPrice} - $${MC_MAX * currentSolPrice}`);
+  console.log(`MC : $${Number(MC_MIN * currentSolPrice).toFixed(2)} - $${Number(MC_MAX * currentSolPrice).toFixed(2)}`);
   
   // Show trading performance
   console.log('\n=== Trading Performance ===');
@@ -338,7 +360,6 @@ function displayStats() {
   console.log(`Win Rate: ${((stats.trades.wins / stats.trades.total) * 100 || 0).toFixed(2)}%`);
   console.log(`Total PNL: ${stats.trades.totalPnL.toFixed(4)} SOL`);
   console.log(`Wins: ${stats.trades.wins} | Losses: ${stats.trades.losses}`);
-  
   
   console.log('\nFilter Failures:');
   console.log(`Market Cap: ${stats.filterStats.mc}`);
@@ -1158,11 +1179,96 @@ function monitorTrade(tokenId) {
   });
 }
 
+// Add function to initialize required files
+async function initializeFiles() {
+  try {
+    // Initialize stats file if it doesn't exist or is empty
+    try {
+      const statsData = await fs.readFile(STATS_FILE, 'utf8');
+      if (!statsData.trim()) {
+        throw new Error('Stats file is empty');
+      }
+      JSON.parse(statsData); // Test if it's valid JSON
+    } catch (error) {
+      console.log('Initializing stats file with default values');
+      const defaultStats = {
+        totalTxs: 0,
+        failedTxs: 0,
+        pumpFunTxs: 0,
+        buyTxs: 0,
+        filterStats: {
+          mc: 0,
+          pump: 0,
+          volume: 0,
+          buys: 0,
+          ownership: 0,
+          liquidity: 0,
+          maxTrades: 0,
+          cooldown: 0
+        },
+        lastReset: Date.now(),
+        trades: {
+          total: 0,
+          wins: 0,
+          losses: 0,
+          totalPnL: 0,
+          history: [],
+          tokenTradeCounts: {},
+          lastTradeTime: {}
+        },
+        timestamp: new Date().toISOString(),
+        solPrice: {
+          current: currentSolPrice,
+          lastUpdate: new Date().toISOString()
+        }
+      };
+      await fs.writeFile(STATS_FILE, JSON.stringify(defaultStats, null, 2));
+    }
+
+    // Initialize active trades file if it doesn't exist or is empty
+    try {
+      const activeTradesData = await fs.readFile(ACTIVE_TRADES_FILE, 'utf8');
+      if (!activeTradesData.trim()) {
+        throw new Error('Active trades file is empty');
+      }
+      JSON.parse(activeTradesData); // Test if it's valid JSON
+    } catch (error) {
+      console.log('Initializing active trades file with default values');
+      const defaultActiveTrades = {
+        timestamp: Date.now(),
+        solPrice: currentSolPrice,
+        lastSolPriceUpdate: Date.now(),
+        activeTrades: [],
+        totalActiveTrades: 0,
+        totalPnL: 0
+      };
+      await fs.writeFile(ACTIVE_TRADES_FILE, JSON.stringify(defaultActiveTrades, null, 2));
+    }
+
+    // Initialize trades file if it doesn't exist
+    try {
+      await fs.readFile(TRADES_FILE, 'utf8');
+    } catch (error) {
+      console.log('Initializing trades file');
+      await fs.writeFile(TRADES_FILE, JSON.stringify([], null, 2));
+    }
+
+    console.log('All required files initialized successfully');
+  } catch (error) {
+    console.error('Error initializing files:', error);
+    throw error;
+  }
+}
+
 // Start bot
 async function startBot() {
   try {
-    // Load strategy configuration first and wait for it to complete
+    // Load strategy configuration first
     await loadStrategyConfig();
+    updateStrategyVariables(); // Update variables after config is loaded
+    
+    // Initialize required files
+    await initializeFiles();
     
     // Initialize connection
     connection = new Connection(HELIUS_RPC_URL, 'confirmed');
@@ -2461,9 +2567,6 @@ async function pumpFunSell(options) {
     }
 }
 
-// Initial update of constants
-//updateStrategyVariables();
-
 /**
  * Checks if a token has a paid DexScreener enhanced profile
  * @param {string} tokenAddress - The token's mint address
@@ -2495,28 +2598,50 @@ async function checkTradeCooldown() {
         return true;
     }
 
-    // Check if we've reached the profit cap
-    const stats = JSON.parse(await fs.readFile(STATS_FILE, 'utf8'));
-    const totalPnL = stats.trades?.totalPnL || 0;
-
-    if (totalPnL >= TRADE_COOLDOWN_PROFIT_CAP) {
-        console.log(`Profit cap reached (${totalPnL} SOL). Starting trade cooldown for ${TRADE_COOLDOWN_DURATION} seconds`);
-        TRADE_COOLDOWN_ACTIVE = true;
-        TRADE_COOLDOWN_START_TIME = Math.floor(Date.now() / 1000);
+    try {
+        // Check if we've reached the profit cap
+        let stats = { trades: { totalPnL: 0 } }; // Default stats
         
-        // Close all profitable positions
-        const activeTrades = JSON.parse(await fs.readFile(ACTIVE_TRADES_FILE, 'utf8'));
-        for (const trade of activeTrades.activeTrades || []) {
-            if (trade.pnl > 0) {
-                console.log(`Closing profitable position for ${trade.tokenSymbol} during cooldown`);
-                await closeTrade(trade.tokenId, 'Cooldown: Profit cap reached', true);
+        try {
+            const statsData = await fs.readFile(STATS_FILE, 'utf8');
+            if (statsData.trim()) {
+                stats = JSON.parse(statsData);
             }
+        } catch (error) {
+            console.log('Stats file not found or corrupted, using default values');
         }
         
-        return true;
-    }
+        const totalPnL = stats.trades?.totalPnL || 0;
 
-    return false;
+        if (totalPnL >= TRADE_COOLDOWN_PROFIT_CAP) {
+            console.log(`Profit cap reached (${totalPnL} SOL). Starting trade cooldown for ${TRADE_COOLDOWN_DURATION} seconds`);
+            TRADE_COOLDOWN_ACTIVE = true;
+            TRADE_COOLDOWN_START_TIME = Math.floor(Date.now() / 1000);
+            
+            // Close all profitable positions
+            try {
+                const activeTradesData = await fs.readFile(ACTIVE_TRADES_FILE, 'utf8');
+                if (activeTradesData.trim()) {
+                    const activeTradesFile = JSON.parse(activeTradesData);
+                    for (const trade of activeTradesFile.activeTrades || []) {
+                        if (trade.pnl > 0) {
+                            console.log(`Closing profitable position for ${trade.tokenSymbol} during cooldown`);
+                            await closeTrade(trade.tokenId, 'Cooldown: Profit cap reached', true);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('Active trades file not found or corrupted, skipping position closure');
+            }
+            
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error in checkTradeCooldown:', error.message);
+        return false;
+    }
 }
 
 async function executeTrade(tokenId, token, buyTime) {
