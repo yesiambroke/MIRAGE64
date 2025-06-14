@@ -42,7 +42,6 @@ let NEUTRAL_ZONE_PRICE_CHANGE_THRESHOLD = 0.005;
 let MOMENTUM_STAGNANT_TIME = 1200;
 let MAX_HOLD_TIME = 60000;
 let MC_MIN = 28;
-let MC_MAX = 40;
 let PUMP_THRESHOLD = 0.05;
 let BUY_THRESHOLD = 3;
 let VOLUME_THRESHOLD = 10;
@@ -170,7 +169,7 @@ function updateStrategyVariables() {
   MOMENTUM_STAGNANT_TIME = getStrategyValue('momentumStagnantTime', 1200);
   MAX_HOLD_TIME = getStrategyValue('maxHoldTime', 60000);
   MC_MIN = getStrategyValue('marketCapLimits.min', 28);
-  MC_MAX = getStrategyValue('marketCapLimits.max', 40);
+  MC_MAX = getStrategyValue('marketCapLimits.max', 34);
   PUMP_THRESHOLD = getStrategyValue('pumpThreshold', 0.05);
   BUY_THRESHOLD = getStrategyValue('buyThreshold', 3);
   VOLUME_THRESHOLD = getStrategyValue('volumeThreshold', 10);
@@ -3040,3 +3039,89 @@ async function monitorTrade(tokenId) {
         }
     });
 }
+
+async function checkUnaccountedTokens() {
+  try {
+    // Get all token accounts owned by the bot
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      BOT_PUBLIC_KEY,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+
+    for (const { account } of tokenAccounts.value) {
+      const tokenInfo = account.data.parsed.info;
+      const tokenMint = tokenInfo.mint;
+      const tokenBalance = tokenInfo.tokenAmount.uiAmount;
+
+      // Skip if balance is 0 or if it's SOL
+      if (tokenBalance <= 0 || tokenMint === NATIVE_MINT.toBase58()) continue;
+
+      // Check if this token is in our active trades
+      const isActiveTrade = Object.values(activeTrades).some(trade => trade.tokenId === tokenMint);
+      
+      if (!isActiveTrade) {
+        console.log(`Found unaccounted token: ${tokenMint} with balance ${tokenBalance}`);
+        
+        // Get token metadata
+        const tokenData = await fetchCoinData(tokenMint);
+        if (!tokenData) {
+          console.log(`Could not fetch data for unaccounted token ${tokenMint}, skipping...`);
+          continue;
+        }
+
+        // Attempt to sell 100% of the unaccounted tokens
+        console.log(`Attempting to sell unaccounted tokens for ${tokenMint}`);
+        try {
+          const sellResult = await pumpFunSell({
+            tokenMint,
+            tokenData,
+            amount: tokenBalance,
+            reason: 'Unaccounted token cleanup',
+            dynamicCompute: true
+          });
+
+          if (sellResult && sellResult.txId) {
+            const txCheck = await checkTransactionStatus(sellResult.txId);
+            if (txCheck.success) {
+              console.log(`Successfully sold unaccounted tokens for ${tokenMint}`);
+            } else {
+              console.log(`Failed to sell unaccounted tokens for ${tokenMint}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error selling unaccounted tokens for ${tokenMint}:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error checking for unaccounted tokens:', error);
+  }
+}
+
+async function startBot() {
+  try {
+    // Load strategy configuration first
+    await loadStrategyConfig();
+    updateStrategyVariables(); // Update variables after config is loaded
+    
+    // Initialize connection
+    connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+    
+    // Start SOL price updates
+    startSolPriceUpdates();
+    
+    // Setup WebSocket connection
+    setupWebSocket();
+    
+    // Start stats display
+    setInterval(displayStats, 1000);
+    
+    console.log('Bot started successfully');
+  } catch (error) {
+    console.error('Error starting bot:', error);
+    process.exit(1);
+  }
+}
+
+// Add periodic check for unaccounted tokens
+setInterval(checkUnaccountedTokens, 30000); // Check every 30 seconds
