@@ -3054,7 +3054,7 @@ async function checkUnaccountedTokens() {
       const tokenBalance = tokenInfo.tokenAmount.uiAmount;
 
       // Skip if balance is 0 or if it's SOL
-      if (tokenBalance <= 0 || tokenMint === NATIVE_MINT.toBase58()) continue;
+      if (tokenBalance <= 10000 || tokenMint === NATIVE_MINT.toBase58()) continue;
 
       // Check if this token is in our active trades
       const isActiveTrade = Object.values(activeTrades).some(trade => trade.tokenId === tokenMint);
