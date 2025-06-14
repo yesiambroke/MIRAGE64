@@ -6,6 +6,8 @@ const dotenv = require('dotenv');
 const bs58 = require('bs58');
 const { exec } = require('child_process');
 const util = require('util');
+const https = require('https');
+const express = require('express');
 const execPromise = util.promisify(exec);
 dotenv.config();
 
@@ -25,7 +27,26 @@ const INITIAL_WALLET_DATA = {
 
 class BotWebSocketServer {
     constructor(port = 9899) {
-        this.wss = new WebSocket.Server({ port });
+        // Create HTTPS server with SSL certificates
+        const app = express();
+        
+        // SSL certificate options
+        const options = {
+            key: fs.readFileSync('/root/boobies_bank/apteka_key.pem'),
+            cert: fs.readFileSync('/root/boobies_bank/apteka.pem')
+        };
+
+        // Create HTTPS server
+        const server = https.createServer(options, app);
+        
+        // Create WebSocket server attached to HTTPS server
+        this.wss = new WebSocket.Server({ server });
+        
+        // Start the server
+        server.listen(port, () => {
+            console.log(`Secure WebSocket server started on port ${port}`);
+        });
+
         this.clients = new Set();
         this.lastStats = null;
         this.lastTrades = null;
@@ -43,7 +64,6 @@ class BotWebSocketServer {
         this.wallet = Keypair.fromSecretKey(privateKey);
         console.log('Wallet address:', this.wallet.publicKey.toString());
         
-        console.log(`WebSocket server started on port ${port}`);
         this.walletSubscription = null; // Add this line to store the subscription
         this.initializeFiles().then(() => {
             this.setupWebSocket();
