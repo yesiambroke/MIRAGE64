@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
-const fs = require('fs').promises;
+const fsPromises = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
 const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const dotenv = require('dotenv');
@@ -77,11 +78,11 @@ class BotWebSocketServer {
         try {
             // Check if wallet.json exists, if not create it
             try {
-                await fs.access(WALLET_FILE);
+                await fsPromises.access(WALLET_FILE);
             } catch (error) {
                 if (error.code === 'ENOENT') {
                     console.log('Creating initial wallet.json file...');
-                    await fs.writeFile(WALLET_FILE, JSON.stringify(INITIAL_WALLET_DATA, null, 2));
+                    await fsPromises.writeFile(WALLET_FILE, JSON.stringify(INITIAL_WALLET_DATA, null, 2));
                 }
             }
         } catch (error) {
@@ -161,7 +162,7 @@ class BotWebSocketServer {
             };
 
             // Write fresh data to file
-            await fs.writeFile(WALLET_FILE, JSON.stringify(walletData, null, 2));
+            await fsPromises.writeFile(WALLET_FILE, JSON.stringify(walletData, null, 2));
             this.lastWalletBalance = walletData;
 
             // Read other data from files
@@ -224,7 +225,7 @@ class BotWebSocketServer {
 
     async readFile(filePath) {
         try {
-            const data = await fs.readFile(filePath, 'utf8');
+            const data = await fsPromises.readFile(filePath, 'utf8');
             return JSON.parse(data);
         } catch (error) {
             if (error.code === 'ENOENT') {
@@ -263,7 +264,7 @@ class BotWebSocketServer {
 
                     // Update trades file if there were duplicates
                     if (sortedTrades.length !== trades.length) {
-                        await fs.writeFile(TRADES_FILE, JSON.stringify(sortedTrades, null, 2));
+                        await fsPromises.writeFile(TRADES_FILE, JSON.stringify(sortedTrades, null, 2));
                     }
 
                     // Check for changes and broadcast
@@ -366,7 +367,7 @@ class BotWebSocketServer {
                         };
 
                         // Write to wallet.json file
-                        await fs.writeFile(WALLET_FILE, JSON.stringify(walletData, null, 2));
+                        await fsPromises.writeFile(WALLET_FILE, JSON.stringify(walletData, null, 2));
 
                         // Update last wallet balance and broadcast if changed
                         if (JSON.stringify(walletData) !== JSON.stringify(this.lastWalletBalance)) {
@@ -420,7 +421,7 @@ class BotWebSocketServer {
                                 tokenBalances
                             };
 
-                            await fs.writeFile(WALLET_FILE, JSON.stringify(walletData, null, 2));
+                            await fsPromises.writeFile(WALLET_FILE, JSON.stringify(walletData, null, 2));
                             this.broadcast({ type: 'wallet', data: walletData });
                             this.lastWalletBalance = walletData;
                         }
@@ -512,7 +513,7 @@ class BotWebSocketServer {
             console.log('Final processed config tradeCooldownEnabled:', processedConfig.tradeCooldownEnabled); // Debug log
 
             // Write updated config
-            await fs.writeFile(
+            await fsPromises.writeFile(
                 STRATEGY_CONFIG_FILE,
                 JSON.stringify(processedConfig, null, 2)
             );
