@@ -8,6 +8,7 @@ const { getAssociatedTokenAddress, getAssociatedTokenAddressSync,createAssociate
 const splToken = require('@solana/spl-token');
 const bs58 = require('bs58');
 const { Buffer } = require('buffer');
+const { TOKEN_PROGRAM_ID, NATIVE_MINT } = require('@solana/spl-token');
 require('dotenv').config();
 
 // Configuration
@@ -68,9 +69,7 @@ let PUMP_FUN_PROGRAM = new PublicKey(PUMP_FUN_PROGRAM_ID);
 let GLOBAL = new PublicKey('4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf');
 let FEE_RECIPIENT = new PublicKey('CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM');
 let PUMP_FUN_ACCOUNT = new PublicKey('Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1');
-let TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 let METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
-let TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 let ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
 // Seeds
@@ -3096,31 +3095,6 @@ async function checkUnaccountedTokens() {
     }
   } catch (error) {
     console.error('Error checking for unaccounted tokens:', error);
-  }
-}
-
-async function startBot() {
-  try {
-    // Load strategy configuration first
-    await loadStrategyConfig();
-    updateStrategyVariables(); // Update variables after config is loaded
-    
-    // Initialize connection
-    connection = new Connection(HELIUS_RPC_URL, 'confirmed');
-    
-    // Start SOL price updates
-    startSolPriceUpdates();
-    
-    // Setup WebSocket connection
-    setupWebSocket();
-    
-    // Start stats display
-    setInterval(displayStats, 1000);
-    
-    console.log('Bot started successfully');
-  } catch (error) {
-    console.error('Error starting bot:', error);
-    process.exit(1);
   }
 }
 
