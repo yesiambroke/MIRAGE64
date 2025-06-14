@@ -325,6 +325,7 @@ function displayStats() {
   console.log(`Time Elapsed: ${Math.floor(timeElapsed)}s`);
   console.log(`SOL Price: $${currentSolPrice.toFixed(2)} (Updated ${Math.floor(timeSincePriceUpdate)}s ago)`);
   console.log(`MC : $${MC_MIN * currentSolPrice} - $${MC_MAX * currentSolPrice}`);
+  console.log(`MC max: $${MC_MAX * currentSolPrice}`);
   
   // Show trading performance
   console.log('\n=== Trading Performance ===');
