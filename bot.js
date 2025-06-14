@@ -122,13 +122,11 @@ async function loadStrategyConfig() {
     const configPath = path.join(__dirname, 'strategy-config.json');
     const configData = await fs.readFile(configPath, 'utf8');
     strategyConfig = JSON.parse(configData);
-    console.log('Strategy configuration loaded successfully');
-
-    // Load cooldown settings
-    TRADE_COOLDOWN_ENABLED = strategyConfig.tradeCooldownEnabled ?? false;
-    TRADE_COOLDOWN_PROFIT_CAP = strategyConfig.tradeCooldownProfitCap ?? 5;
-    TRADE_COOLDOWN_DURATION = strategyConfig.tradeCooldownDuration ?? 3600;
     
+    // Update variables immediately after loading config
+    updateStrategyVariables();
+    
+    console.log('Strategy configuration loaded successfully');
     return strategyConfig;
   } catch (error) {
     console.error('Error loading strategy configuration:', error);
@@ -136,50 +134,59 @@ async function loadStrategyConfig() {
   }
 }
 
-// Function to get strategy config value with fallback
-function getStrategyValue(key, defaultValue) {
+// Function to get strategy config value - no defaults allowed
+function getStrategyValue(key) {
   if (!strategyConfig) {
-    console.warn(`Strategy config not loaded, using default value for ${key}`);
-    return defaultValue;
+    throw new Error(`Strategy config not loaded when trying to access ${key}`);
   }
-  return strategyConfig[key] ?? defaultValue;
+
+  // Handle nested properties (e.g., "momentumProfitThresholds.threshold1")
+  const parts = key.split('.');
+  let value = strategyConfig;
+  
+  for (const part of parts) {
+    if (!(part in value)) {
+      throw new Error(`Required config value '${key}' is missing from strategy-config.json`);
+    }
+    value = value[part];
+  }
+  
+  return value;
 }
 
 // Function to update all dependent variables after config reload
 function updateStrategyVariables() {
-  TRADE_AMOUNT = getStrategyValue('tradeAmount', 0.2);
-  MAX_TR = getStrategyValue('maxTrades', 3);
-  MAX_TRADES_PER_TOKEN = getStrategyValue('maxTradesPerToken', 3);
-  TRADE_COOLDOWN = getStrategyValue('tradeCooldown', 120000);
-  PROFIT_THRESHOLD = getStrategyValue('profitThreshold', 1.0);
-  LOSS_THRESHOLD = getStrategyValue('lossThreshold', -0.06);
-  MOMENTUM_PROFIT_THRESHOLD = getStrategyValue('momentumProfitThreshold', 0.02);
-  MOMENTUM_PROFIT_THRESHOLD_1 = getStrategyValue('momentumProfitThresholds.threshold1', 0.15);
-  MOMENTUM_PROFIT_THRESHOLD_2 = getStrategyValue('momentumProfitThresholds.threshold2', 0.3);
-  MOMENTUM_PROFIT_THRESHOLD_3 = getStrategyValue('momentumProfitThresholds.threshold3', 0.6);
-  MOMENTUM_PROFIT_THRESHOLD_4 = getStrategyValue('momentumProfitThresholds.threshold4', 0.8);
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_1 = getStrategyValue('momentumPriceChangeThresholds.threshold1', 0.05);
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_2 = getStrategyValue('momentumPriceChangeThresholds.threshold2', 0.08);
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_3 = getStrategyValue('momentumPriceChangeThresholds.threshold3', 0.12);
-  MOMENTUM_PRICE_CHANGE_THRESHOLD_4 = getStrategyValue('momentumPriceChangeThresholds.threshold4', 0.15);
-  LOSS_THRESHOLD_TRAIL = getStrategyValue('lossThresholdTrail', 0.045);
-  LOSS_PRICE_CHANGE_THRESHOLD_TRAIL = getStrategyValue('lossPriceChangeThresholdTrail', 0.01);
-  NEUTRAL_ZONE_PRICE_CHANGE_THRESHOLD = getStrategyValue('neutralZonePriceChangeThreshold', 0.005);
-  MOMENTUM_STAGNANT_TIME = getStrategyValue('momentumStagnantTime', 1200);
-  MAX_HOLD_TIME = getStrategyValue('maxHoldTime', 60000);
-  MC_MIN = getStrategyValue('marketCapLimits.min', 28);
-  MC_MAX = getStrategyValue('marketCapLimits.max', 34);
-  PUMP_THRESHOLD = getStrategyValue('pumpThreshold', 0.05);
-  BUY_THRESHOLD = getStrategyValue('buyThreshold', 3);
-  VOLUME_THRESHOLD = getStrategyValue('volumeThreshold', 10);
-  MIN_VOLUME = getStrategyValue('minVolume', 1.5);
-  CREATOR_OWNERSHIP_MAX = getStrategyValue('creatorOwnershipMax', 0.2);
-  USE_DEX_SCREENER_FILTER = getStrategyValue('useDexScreenerFilter', false);
-
-  // Update cooldown settings
-  TRADE_COOLDOWN_ENABLED = getStrategyValue('tradeCooldownEnabled', false);
-  TRADE_COOLDOWN_PROFIT_CAP = getStrategyValue('tradeCooldownProfitCap', 5);
-  TRADE_COOLDOWN_DURATION = getStrategyValue('tradeCooldownDuration', 3600);
+  TRADE_AMOUNT = getStrategyValue('tradeAmount');
+  MAX_TR = getStrategyValue('maxTrades');
+  MAX_TRADES_PER_TOKEN = getStrategyValue('maxTradesPerToken');
+  TRADE_COOLDOWN = getStrategyValue('tradeCooldown');
+  PROFIT_THRESHOLD = getStrategyValue('profitThreshold');
+  LOSS_THRESHOLD = getStrategyValue('lossThreshold');
+  MOMENTUM_PROFIT_THRESHOLD = getStrategyValue('momentumProfitThreshold');
+  MOMENTUM_PROFIT_THRESHOLD_1 = getStrategyValue('momentumProfitThresholds.threshold1');
+  MOMENTUM_PROFIT_THRESHOLD_2 = getStrategyValue('momentumProfitThresholds.threshold2');
+  MOMENTUM_PROFIT_THRESHOLD_3 = getStrategyValue('momentumProfitThresholds.threshold3');
+  MOMENTUM_PROFIT_THRESHOLD_4 = getStrategyValue('momentumProfitThresholds.threshold4');
+  MOMENTUM_PRICE_CHANGE_THRESHOLD_1 = getStrategyValue('momentumPriceChangeThresholds.threshold1');
+  MOMENTUM_PRICE_CHANGE_THRESHOLD_2 = getStrategyValue('momentumPriceChangeThresholds.threshold2');
+  MOMENTUM_PRICE_CHANGE_THRESHOLD_3 = getStrategyValue('momentumPriceChangeThresholds.threshold3');
+  MOMENTUM_PRICE_CHANGE_THRESHOLD_4 = getStrategyValue('momentumPriceChangeThresholds.threshold4');
+  LOSS_THRESHOLD_TRAIL = getStrategyValue('lossThresholdTrail');
+  LOSS_PRICE_CHANGE_THRESHOLD_TRAIL = getStrategyValue('lossPriceChangeThresholdTrail');
+  NEUTRAL_ZONE_PRICE_CHANGE_THRESHOLD = getStrategyValue('neutralZonePriceChangeThreshold');
+  MOMENTUM_STAGNANT_TIME = getStrategyValue('momentumStagnantTime');
+  MAX_HOLD_TIME = getStrategyValue('maxHoldTime');
+  MC_MIN = getStrategyValue('marketCapLimits.min');
+  MC_MAX = getStrategyValue('marketCapLimits.max');
+  PUMP_THRESHOLD = getStrategyValue('pumpThreshold');
+  BUY_THRESHOLD = getStrategyValue('buyThreshold');
+  VOLUME_THRESHOLD = getStrategyValue('volumeThreshold');
+  MIN_VOLUME = getStrategyValue('minVolume');
+  CREATOR_OWNERSHIP_MAX = getStrategyValue('creatorOwnershipMax');
+  USE_DEX_SCREENER_FILTER = getStrategyValue('useDexScreenerFilter');
+  TRADE_COOLDOWN_ENABLED = getStrategyValue('tradeCooldownEnabled');
+  TRADE_COOLDOWN_PROFIT_CAP = getStrategyValue('tradeCooldownProfitCap');
+  TRADE_COOLDOWN_DURATION = getStrategyValue('tradeCooldownDuration');
 }
 
 // Watch strategy-config.json for changes
@@ -324,7 +331,6 @@ function displayStats() {
   console.log(`Time Elapsed: ${Math.floor(timeElapsed)}s`);
   console.log(`SOL Price: $${currentSolPrice.toFixed(2)} (Updated ${Math.floor(timeSincePriceUpdate)}s ago)`);
   console.log(`MC : $${MC_MIN * currentSolPrice} - $${MC_MAX * currentSolPrice}`);
-  console.log(`MC max: $${MC_MAX * currentSolPrice}`);
   
   // Show trading performance
   console.log('\n=== Trading Performance ===');
@@ -333,11 +339,6 @@ function displayStats() {
   console.log(`Total PNL: ${stats.trades.totalPnL.toFixed(4)} SOL`);
   console.log(`Wins: ${stats.trades.wins} | Losses: ${stats.trades.losses}`);
   
-  console.log('\nTransaction Stats:');
-  console.log(`Total Txs: ${stats.totalTxs}`);
-  console.log(`Failed Txs: ${stats.failedTxs}`);
-  console.log(`Pump.fun Txs: ${stats.pumpFunTxs}`);
-  console.log(`Buy Txs: ${stats.buyTxs}`);
   
   console.log('\nFilter Failures:');
   console.log(`Market Cap: ${stats.filterStats.mc}`);
@@ -1160,9 +1161,8 @@ function monitorTrade(tokenId) {
 // Start bot
 async function startBot() {
   try {
-    // Load strategy configuration first
+    // Load strategy configuration first and wait for it to complete
     await loadStrategyConfig();
-    updateStrategyVariables(); // Update variables after config is loaded
     
     // Initialize connection
     connection = new Connection(HELIUS_RPC_URL, 'confirmed');
@@ -2462,7 +2462,7 @@ async function pumpFunSell(options) {
 }
 
 // Initial update of constants
-updateStrategyVariables();
+//updateStrategyVariables();
 
 /**
  * Checks if a token has a paid DexScreener enhanced profile
